@@ -32,6 +32,14 @@ def parser():
         default=None,
         help="Your Username/Nickname"
     )
+
+    # TODO Password pflicht machen
+    parser.add_argument(
+        '-k', '--key',
+        type=str,
+        required=None,
+        help="Your Password"
+    )
     
     args = parser.parse_args()
 
@@ -51,6 +59,9 @@ def parser():
     if args.user is None:
         args.user = input("Choose a nickname: ")
     
+    if args.key is None:
+        args.key = input("Password: ")
+
     return args
 
 if __name__ == "__main__":
@@ -59,6 +70,11 @@ if __name__ == "__main__":
     IP = args.ip
     Port = args.port
     nickname = args.user
+    level = 0
+    ranks = ["Noob", "King", "Chad"]
+    rank=""
+    msg_count = 0
+
 
     if not IP:
         print("Error. Server IP cannot be empty. Exiting")
@@ -70,7 +86,32 @@ try:
     print(f"Connected to {IP}:{Port}...")
 except ConnectionRefusedError:
     print("Couldn't connect to the Server")
-    sys.exit(1)
+    os._exit(0)
+
+while True:
+    try: 
+        msg = client.recv(1024).decode('ascii')
+
+        if msg == 'USER':
+            client.send(nickname.encode('ascii'))
+        elif msg == 'KEY':
+            client.send(args.key.encode('ascii'))
+        elif msg == 'SUCCESS':
+            welcome_msg = client.recv(1024).decode('ascii')
+            print("Login successful")
+            print(welcome_msg)
+            break
+        elif msg == 'FAIL':
+            print("Login failed: Invalid Username or Key. Disconneting...")
+            client.close()
+            os._exit(0)
+        else:
+            print(msg)
+            break
+    except:
+        print("Error occurred during login! Disconneting...")
+        client.close()
+        os._exit(0)
 
 def receive():
     while True:
@@ -86,7 +127,20 @@ def receive():
             os._exit(0)
             break
 
+def rang(level):
+    global rank
+    if level >= 0 and level < 10:
+        rank = ranks[0]
+    if level >= 10 and level < 20:
+        rank = ranks[1]
+    if level >= 20:
+        rank = ranks[2] 
+    return rank
+
 def write():
+    global level
+    global rank
+    global msg_count
     while True:
         user_input = input("")
         if user_input.lower() == '.exit':
@@ -95,9 +149,24 @@ def write():
             os._exit(0)
             break
 
+        # TODO .help nicht sichtbar im Chat machen
+        if user_input.lower() == '.help':
+            print("Commands you can use:\n"\
+            ".exit to Disconnet\n" \
+            ".lvl to show level\n"\
+            ".msgcount to see how many messages you have sent")
+
+        if user_input.lower() == '.lvl':
+            print(f"Dein Rank: {rang(level)}")
+
+        if user_input.lower() == '.msgcount':
+            print(f"Message Counter: {msg_count}")
+
         msg = f'{nickname}: {user_input}'
         try:
             client.send(msg.encode('ascii'))
+            level += 1
+            msg_count += 1
         except socket.error as e:
             print(f"Error sending message: {e}")
             break
